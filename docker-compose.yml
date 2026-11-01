@@ -1,0 +1,37 @@
+services:
+  mongodb:
+    image: mongo:7
+
+    restart: unless-stopped
+    volumes: [mongo_data:/data/db]
+  mosquitto:
+    image: eclipse-mosquitto:2
+
+    restart: unless-stopped
+    ports: ["${MQTT_BIND:-127.0.0.1}:${MQTT_HOST_PORT:-28884}:1883"]
+    volumes:
+      - ./mosquitto/config/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mosquitto_data:/mosquitto/data
+  backend:
+    build: ./backend
+
+    restart: unless-stopped
+    depends_on: [mongodb, mosquitto]
+    environment:
+      MONGO_URL: mongodb://mongodb:27017
+      MQTT_HOST: mosquitto
+      MQTT_PORT: "1883"
+      TELEMETRY_TIMEOUT_SECONDS: "8"
+    ports: ["127.0.0.1:${API_HOST_PORT:-18002}:8000"]
+  dashboard:
+    image: nginx:alpine
+
+    restart: unless-stopped
+    depends_on: [backend]
+    ports: ["127.0.0.1:${DASHBOARD_HOST_PORT:-18082}:80"]
+    volumes:
+      - ./dashboard/index.html:/usr/share/nginx/html/index.html:ro
+      - ./dashboard/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+volumes:
+  mongo_data:
+  mosquitto_data:
